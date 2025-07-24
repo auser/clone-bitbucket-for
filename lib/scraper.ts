@@ -1,10 +1,15 @@
 import { chromium, Browser, Page } from 'playwright';
 import { BitbucketAuth, BitbucketConfig, getBitbucketAuth } from './config.js';
+import { Logger } from './logger.js';
 
 
 
-export async function scrape(uri: string, searchTerm: string): Promise<string[]> {
-  console.log(`Scraping: ${uri}`);
+export async function scrape(uri: string, searchTerm: string, logger?: Logger): Promise<string[]> {
+  if (logger) {
+    logger.debug(`Scraping: ${uri}`);
+  } else {
+    console.log(`Scraping: ${uri}`);
+  }
 
   const config = await getBitbucketAuth();
   const browser: Browser = await chromium.launch({ headless: true });
@@ -12,22 +17,26 @@ export async function scrape(uri: string, searchTerm: string): Promise<string[]>
 
   try {
     // First, authenticate with Bitbucket
-    await authenticateWithBitbucket(page, config);
+    await authenticateWithBitbucket(page, config, logger);
 
     // Now navigate to the target URL
     await page.goto(uri);
-    await searchForCodeInBitbucket(page, searchTerm);
-    const searchResults = await scrapeForEachResult(page);
+    await searchForCodeInBitbucket(page, searchTerm, logger);
+    const searchResults = await scrapeForEachResult(page, logger);
     const searchResultSet = new Set(searchResults);
 
     const results: string[] = [];
     for (const href of searchResultSet) {
-      const gitCloneUrl = await getGitCloneUrl(page, href);
+      const gitCloneUrl = await getGitCloneUrl(page, href, logger);
       results.push(gitCloneUrl);
     }
     return results;
   } catch (error) {
-    console.error('Error scraping:', error);
+    if (logger) {
+      logger.error('Error scraping:', { error: (error as Error).message, stack: (error as Error).stack });
+    } else {
+      console.error('Error scraping:', error);
+    }
     return [];
   } finally {
     await browser.close();
@@ -36,7 +45,7 @@ export async function scrape(uri: string, searchTerm: string): Promise<string[]>
 
 
 
-export async function getGitCloneUrl(page: Page, href: string): Promise<string> {
+export async function getGitCloneUrl(page: Page, href: string, logger?: Logger): Promise<string> {
   try {
     await page.goto(href);
     await waitForResultsToLoad(page);
@@ -55,7 +64,7 @@ export async function getGitCloneUrl(page: Page, href: string): Promise<string> 
   return repoUrl;
 }
 
-async function scrapeForEachResult(page: Page): Promise<string[]> {
+async function scrapeForEachResult(page: Page, logger?: Logger): Promise<string[]> {
   const results: string[] = [];
 
   // Wait for search results to load
@@ -116,7 +125,7 @@ async function waitForResultsToLoad(page: Page): Promise<void> {
   return;
 }
 
-async function searchForCodeInBitbucket(page: Page, searchTerm: string): Promise<void> {
+async function searchForCodeInBitbucket(page: Page, searchTerm: string, logger?: Logger): Promise<void> {
   // Find the global search input using the data-test-id from the image
   // const searchInput = await page.locator('[data-test-id="search-dialog-input"]');
   const searchInput = await page.getByPlaceholder('Search');
@@ -156,7 +165,7 @@ async function searchForCodeInBitbucket(page: Page, searchTerm: string): Promise
 }
 
 
-async function authenticateWithBitbucket(page: Page, config: BitbucketAuth): Promise<void> {
+async function authenticateWithBitbucket(page: Page, config: BitbucketAuth, logger?: Logger): Promise<void> {
   console.log('Authenticating with Bitbucket...');
 
   // Go to Bitbucket login page

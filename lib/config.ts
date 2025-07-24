@@ -25,12 +25,19 @@ export interface OnePasswordConfig {
 
 export interface Config {
   clonePath: string; // Path to clone the repositories to
+  logDir?: string; // Directory to store log files
+  logFile?: string; // Name of the log file
 }
 
 export function getConfig(): Config {
   const clonePath = process.env.CLONE_PATH || path.join(process.cwd(), 'code');
+  const logDir = process.env.LOG_DIR || path.join(process.cwd(), 'logs');
+  const logFile = process.env.LOG_FILE || 'scraper.log';
+
   return {
-    clonePath
+    clonePath,
+    logDir,
+    logFile
   };
 }
 

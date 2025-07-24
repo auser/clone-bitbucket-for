@@ -6,6 +6,7 @@ import { exec } from 'node:child_process';
 import { mkdirSync, existsSync } from 'node:fs';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
+import { initializeLogger, getLogger, getLogLevel, LogLevel } from './lib/logger.js';
 
 async function main() {
   const argv = await yargs(hideBin(process.argv))
@@ -28,6 +29,12 @@ async function main() {
       description: 'Directory to clone repositories to',
       default: undefined
     })
+    .option('branch', {
+      alias: 'b',
+      type: 'string',
+      description: 'Branch to clone from (falls back to default if not found)',
+      default: undefined
+    })
     .option('dry-run', {
       alias: 'd',
       type: 'boolean',
@@ -36,9 +43,9 @@ async function main() {
     })
     .option('verbose', {
       alias: 'v',
-      type: 'boolean',
-      description: 'Enable verbose output',
-      default: false
+      type: 'count',
+      description: 'Increase verbosity (use multiple times: -v, -vv, -vvv)',
+      default: 0
     })
     .option('max-results', {
       alias: 'm',
@@ -46,11 +53,36 @@ async function main() {
       description: 'Maximum number of repositories to clone',
       default: undefined
     })
+    .option('log-level', {
+      alias: 'l',
+      type: 'string',
+      description: 'Log level (error, warn, info, debug, verbose)',
+      default: 'info'
+    })
+    .option('log-to-file', {
+      type: 'boolean',
+      description: 'Enable logging to files',
+      default: false
+    })
+
+    .option('no-console', {
+      type: 'boolean',
+      description: 'Disable console output (only log to files)',
+      default: false
+    })
     .help()
     .alias('help', 'h')
     .version()
     .alias('version', 'V')
     .argv;
+
+  // Determine log level based on verbose count and log-level option
+  let effectiveLogLevel = argv.logLevel ?? 'info';
+  if (argv.verbose > 0) {
+    const verboseLevels = ['info', 'debug', 'verbose'];
+    const verboseIndex = Math.min(argv.verbose - 1, verboseLevels.length - 1);
+    effectiveLogLevel = verboseLevels[verboseIndex] || 'info';
+  }
 
   const config = getConfig();
 
@@ -59,27 +91,41 @@ async function main() {
     config.clonePath = argv.clonePath;
   }
 
-  if (argv.verbose) {
-    console.log('Configuration:', config);
-    console.log('Search URL:', argv.url);
-    console.log('Search term:', argv.search);
-    console.log('Clone path:', config.clonePath);
-    console.log('Dry run:', argv.dryRun);
-    if (argv.maxResults) {
-      console.log('Max results:', argv.maxResults);
-    }
-  }
+  // Initialize logger
+  const logLevel = getLogLevel(effectiveLogLevel);
+  const logger = initializeLogger({
+    level: logLevel,
+    logToFile: argv.logToFile,
+    logDir: config.logDir || undefined,
+    logFile: config.logFile || undefined,
+    consoleOutput: !argv.noConsole
+  });
 
-  console.log(`🔍 Searching for "${argv.search}" on ${argv.url}...`);
+  // Log configuration
+  logger.logConfiguration({
+    clonePath: config.clonePath,
+    searchUrl: argv.url,
+    searchTerm: argv.search,
+    branch: argv.branch || 'default',
+    dryRun: argv.dryRun,
+    maxResults: argv.maxResults,
+    verboseCount: argv.verbose,
+    effectiveLogLevel,
+    logToFile: argv.logToFile,
+    logDir: config.logDir,
+    logFile: config.logFile,
+    noConsole: argv.noConsole
+  });
 
-  const results = await scrape(argv.url, argv.search);
+  // Log search start
+  logger.search(argv.search, argv.url);
 
-  if (argv.verbose) {
-    console.log(`Found ${results.length} repositories`);
-  }
+  const results = await scrape(argv.url, argv.search, logger);
+
+  logger.debug(`Found ${results.length} repositories`);
 
   if (results.length === 0) {
-    console.log('❌ No repositories found matching your search criteria.');
+    logger.noResults();
     return;
   }
 
@@ -88,20 +134,22 @@ async function main() {
     ? results.slice(0, argv.maxResults)
     : results;
 
-  console.log(`📁 Found ${repositoriesToClone.length} repository(ies) to clone`);
+  logger.foundRepositories(repositoriesToClone.length);
 
   if (argv.dryRun) {
-    console.log('\n🔍 DRY RUN - Would clone the following repositories:');
+    logger.dryRun(repositoriesToClone);
+    logger.info('🔍 DRY RUN - Would clone the following repositories:');
     repositoriesToClone.forEach((result, index) => {
       const repoName = result.split('/').pop();
-      console.log(`${index + 1}. ${repoName} (${result})`);
+      const branchInfo = argv.branch ? ` (branch: ${argv.branch})` : '';
+      logger.info(`${index + 1}. ${repoName} (${result})${branchInfo}`);
     });
     return;
   }
 
   // Ensure clone directory exists
   if (!existsSync(config.clonePath)) {
-    console.log(`📂 Creating clone directory: ${config.clonePath}`);
+    logger.info(`📂 Creating clone directory: ${config.clonePath}`);
     mkdirSync(config.clonePath, { recursive: true });
   }
 
@@ -110,41 +158,89 @@ async function main() {
 
   for (const [index, result] of repositoriesToClone.entries()) {
     const repoName = result.split('/').pop();
-    console.log(`\n[${index + 1}/${repositoriesToClone.length}] 🚀 Cloning ${repoName}...`);
+    logger.cloningRepository(repoName!, index + 1, repositoriesToClone.length);
 
     if (existsSync(`${config.clonePath}/${repoName}`)) {
-      console.log(`❌ ${repoName} already exists`);
+      logger.repositoryExists(repoName!);
       continue;
     }
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        exec(`git clone ${result} ${config.clonePath}/${repoName}`, (error, stdout, stderr) => {
-          if (error) {
-            console.error(`❌ Failed to clone ${repoName}:`, error.message);
-            errorCount++;
-            reject(error);
-          } else {
-            console.log(`✅ Successfully cloned ${repoName}`);
-            successCount++;
-            resolve();
-          }
-        });
-      });
+      await cloneRepository(result, repoName!, config.clonePath, argv.branch as string | undefined, logger);
+      successCount++;
     } catch (error) {
-      // Error already logged above
+      logger.cloneError(repoName!, (error as Error).message);
+      errorCount++;
     }
   }
 
-  console.log(`\n🎉 Cloning complete!`);
-  console.log(`✅ Successfully cloned: ${successCount} repository(ies)`);
-  if (errorCount > 0) {
-    console.log(`❌ Failed to clone: ${errorCount} repository(ies)`);
+  logger.cloningComplete(successCount, errorCount, config.clonePath);
+
+  // Also log summary to console if not disabled
+  if (!argv.noConsole) {
+    console.log(`\n🎉 Cloning complete!`);
+    console.log(`✅ Successfully cloned: ${successCount} repository(ies)`);
+    if (errorCount > 0) {
+      console.log(`❌ Failed to clone: ${errorCount} repository(ies)`);
+    }
+    console.log(`📂 Repositories saved to: ${config.clonePath}`);
+
+    if (argv.logToFile) {
+      const logFile = logger.getLogFilePath();
+      const errorLogFile = logger.getErrorLogFilePath();
+      console.log(`📝 Logs saved to: ${logFile}`);
+      if (errorLogFile) {
+        console.log(`❌ Error logs saved to: ${errorLogFile}`);
+      }
+    }
   }
-  console.log(`📂 Repositories saved to: ${config.clonePath}`);
+}
+
+async function cloneRepository(repoUrl: string, repoName: string, clonePath: string, branch: string | undefined, logger: any): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    if (branch) {
+      // Try to clone from specific branch first
+      logger.debug(`Attempting to clone from branch: ${branch}`, { repoName, branch });
+
+      exec(`git clone -b ${branch} ${repoUrl} ${clonePath}/${repoName}`, (error, stdout, stderr) => {
+        if (error) {
+          logger.cloneFallback(repoName, branch);
+
+          // Fall back to default branch
+          exec(`git clone ${repoUrl} ${clonePath}/${repoName}`, (fallbackError, fallbackStdout, fallbackStderr) => {
+            if (fallbackError) {
+              reject(new Error(fallbackError.message));
+            } else {
+              logger.cloneSuccess(repoName);
+              resolve();
+            }
+          });
+        } else {
+          logger.cloneSuccess(repoName, branch);
+          resolve();
+        }
+      });
+    } else {
+      // Clone from default branch
+      exec(`git clone ${repoUrl} ${clonePath}/${repoName}`, (error, stdout, stderr) => {
+        if (error) {
+          reject(new Error(error.message));
+        } else {
+          logger.cloneSuccess(repoName);
+          resolve();
+        }
+      });
+    }
+  });
 }
 
 main().catch(error => {
-  console.error('💥 Fatal error:', error.message);
+  const logger = getLogger();
+  logger.error('💥 Fatal error:', { error: error.message, stack: error.stack });
+
+  // Also log to console if not disabled
+  if (logger) {
+    console.error('💥 Fatal error:', error.message);
+  }
   process.exit(1);
 });

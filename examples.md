@@ -68,8 +68,52 @@ pnpm scraper --url "https://bitbucket.company.com" --search "config.yml"
 
 ### 8. Verbose Output
 ```bash
-# Get detailed information about the process
+# Basic verbose output
 pnpm scraper --search "package.json" --verbose
+
+# More detailed output with configuration info
+pnpm scraper --search "package.json" -vv
+
+# Maximum verbosity with all details
+pnpm scraper --search "package.json" -vvv
+```
+
+### 9. Clone from Specific Branch
+```bash
+# Clone from develop branch
+pnpm scraper --search "package.json" --branch "develop"
+
+# Clone from feature branch
+pnpm scraper --search "webpack.config.js" --branch "feature/new-ui"
+
+# Clone from main branch with verbose output
+pnpm scraper --search "README.md" --branch "main" --verbose
+```
+
+### 10. Logging and Debugging
+```bash
+# Enable file logging with debug level
+pnpm scraper --search "package.json" --log-to-file --log-level debug
+
+# Log to files only (no console output)
+pnpm scraper --search "webpack.config.js" --log-to-file --no-console
+
+# Custom log directory and file name (via environment variables)
+export LOG_DIR="./my-logs"
+export LOG_FILE="custom.log"
+pnpm scraper --search "README.md" --log-to-file
+
+# Different log levels
+pnpm scraper --search "package.json" --log-to-file --log-level error    # Only errors
+pnpm scraper --search "package.json" --log-to-file --log-level warn     # Warnings and errors
+pnpm scraper --search "package.json" --log-to-file --log-level info     # Info, warnings, and errors
+pnpm scraper --search "package.json" --log-to-file --log-level debug    # Debug, info, warnings, and errors
+pnpm scraper --search "package.json" --log-to-file --log-level verbose  # All log levels
+
+# Verbose flags (alternative to log-level)
+pnpm scraper --search "package.json" --verbose                          # Basic verbose
+pnpm scraper --search "package.json" -vv                                # Debug level
+pnpm scraper --search "package.json" -vvv                               # Maximum verbosity
 ```
 
 ## Real-World Scenarios
@@ -112,6 +156,37 @@ pnpm scraper --search "tsconfig.json"
 
 # Find ESLint configurations
 pnpm scraper --search ".eslintrc.js"
+```
+
+### Scenario 5: Branch-Specific Development
+Clone repositories from specific branches for development work:
+```bash
+# Clone from develop branches
+pnpm scraper --search "package.json" --branch "develop" --dry-run
+
+# Clone from feature branches
+pnpm scraper --search "webpack.config.js" --branch "feature/new-ui" --max-results 3
+
+# Clone from staging branches
+pnpm scraper --search "docker-compose.yml" --branch "staging"
+```
+
+### Scenario 6: Production Logging and Monitoring
+Set up comprehensive logging for production environments:
+```bash
+# Production logging with error tracking
+pnpm scraper --search "package.json" --log-to-file --log-level error --no-console
+
+# Development debugging with full logs
+export LOG_DIR="./debug-logs"
+pnpm scraper --search "webpack.config.js" --log-to-file --log-level debug
+
+# Automated script with logging
+pnpm scraper --search "README.md" --log-to-file --log-level info --max-results 10
+
+# Quick debugging with verbose flags
+pnpm scraper --search "package.json" -vv --dry-run
+pnpm scraper --search "webpack.config.js" -vvv --log-to-file
 ```
 
 ## Tips and Best Practices

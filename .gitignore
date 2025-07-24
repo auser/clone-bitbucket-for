@@ -88,4 +88,5 @@ tmp/
 temp/ 
 
 .envcode/
-repos/
+repos
+logs/

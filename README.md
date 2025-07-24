@@ -60,6 +60,12 @@ CLONE_PATH="./repositories"
 
 # Optional: Custom Bitbucket URL (defaults to https://bitbucket.org)
 BITBUCKET_BASE_URL="https://bitbucket.org"
+
+# Optional: Custom log directory (defaults to ./logs)
+LOG_DIR="./logs"
+
+# Optional: Custom log file name (defaults to scraper.log)
+LOG_FILE="scraper.log"
 ```
 
 ### 1Password Setup
@@ -111,11 +117,23 @@ pnpm scraper --help
 **Optional Options:**
 - `--url, -u`: Bitbucket URL to search (default: https://bitbucket.org)
 - `--clone-path, -c`: Directory to clone repositories to (overrides CLONE_PATH env var)
+- `--branch, -b`: Branch to clone from (falls back to default if not found)
 - `--dry-run, -d`: Show what would be cloned without actually cloning
-- `--verbose, -v`: Enable verbose output
+- `--verbose, -v`: Increase verbosity (use multiple times: -v, -vv, -vvv)
 - `--max-results, -m`: Maximum number of repositories to clone
+- `--log-level, -l`: Log level (error, warn, info, debug, verbose) (default: info)
+- `--log-to-file`: Enable logging to files
+- `--no-console`: Disable console output (only log to files)
 - `--help, -h`: Show help
 - `--version, -V`: Show version number
+
+### Verbose Levels
+
+The `--verbose` flag can be used multiple times to increase verbosity:
+
+- `-v` or `--verbose`: Basic verbose output (info level)
+- `-vv`: Debug level output (includes configuration details)
+- `-vvv`: Maximum verbosity (includes all details and error stacks)
 
 #### Examples
 
@@ -141,12 +159,42 @@ pnpm scraper --search "docker-compose.yml" --clone-path "./my-repos"
 
 **Verbose output:**
 ```bash
+# Basic verbose output
 pnpm scraper --search "README.md" --verbose
+
+# More detailed output
+pnpm scraper --search "README.md" -vv
+
+# Maximum verbosity
+pnpm scraper --search "README.md" -vvv
 ```
 
 **Search on a different Bitbucket instance:**
 ```bash
 pnpm scraper --url "https://bitbucket.company.com" --search "config.yml"
+```
+
+**Clone from a specific branch:**
+```bash
+pnpm scraper --search "package.json" --branch "develop"
+```
+
+**Enable file logging:**
+```bash
+pnpm scraper --search "package.json" --log-to-file --log-level debug
+```
+
+**Log to files only (no console output):**
+```bash
+pnpm scraper --search "package.json" --log-to-file --no-console
+```
+
+**Custom log directory and file name (via environment variables):**
+```bash
+# Set custom log directory and file name
+export LOG_DIR="./my-logs"
+export LOG_FILE="custom.log"
+pnpm scraper --search "package.json" --log-to-file
 ```
 
 ### Global Installation Usage
@@ -199,6 +247,9 @@ pnpm start
 2. **Search**: Navigates to Bitbucket and searches for the specified file across all accessible repositories
 3. **Result Processing**: Extracts repository URLs from search results, handling pagination
 4. **Repository Cloning**: For each matching repository, extracts the git clone URL and clones it locally
+5. **Branch Handling**: If a specific branch is requested, attempts to clone from that branch first, then falls back to the default branch if the specified branch doesn't exist
+6. **Logging**: Comprehensive logging system with multiple verbosity levels, supporting both console and file output
+7. **Verbose Levels**: Count-based verbose flag (-v, -vv, -vvv) for different levels of detail
 
 ## Project Structure
 
@@ -218,6 +269,7 @@ scraper/
 - **1Password CLI**: Secure credential management
 - **otpauth**: TOTP code generation for 2FA
 - **dotenv**: Environment variable management
+- **winston**: Advanced logging with multiple transports and formats
 
 ## Troubleshooting
 
@@ -238,9 +290,29 @@ scraper/
    - Check your git configuration
    - Ensure the clone directory is writable
 
+4. **Logging Issues**
+   - Check log file permissions in the logs directory
+   - Verify the log directory is writable
+   - Use `--log-level debug` or `-vv` for detailed debugging information
+   - Use `-vvv` for maximum verbosity and error details
+   - Configure log directory and file name via `LOG_DIR` and `LOG_FILE` environment variables
+
 ### Debug Mode
 
-For debugging, you can modify the browser launch options in `lib/scraper.ts`:
+For debugging, you can use the verbose flags:
+
+```bash
+# Basic debugging
+pnpm scraper --search "package.json" --verbose
+
+# Detailed debugging with configuration info
+pnpm scraper --search "package.json" -vv
+
+# Maximum debugging with all details
+pnpm scraper --search "package.json" -vvv
+```
+
+For browser debugging, you can modify the browser launch options in `lib/scraper.ts`:
 
 ```typescript
 const browser: Browser = await chromium.launch({ 
