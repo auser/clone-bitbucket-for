@@ -90,3 +90,4 @@ temp/
 .envcode/
 repos
 logs/
+jquery-analysis-report.txt

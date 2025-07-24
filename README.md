@@ -1,345 +1,223 @@
-# Bitbucket Code Scraper
+# jQuery Upgrade Toolkit
 
-A TypeScript-based web scraper that searches for specific code files across Bitbucket repositories and automatically clones matching repositories.
+This toolkit provides automated scripts to upgrade jQuery to version 3.7.1 across multiple repositories. It handles various jQuery usage patterns including embedded files, dependency management, and plugin compatibility.
 
 ## Overview
 
-This tool automates the process of finding repositories containing specific files (like `jquery-2.1.0.min.js`) on Bitbucket and cloning them to your local machine. It uses Playwright for web automation and integrates with 1Password for secure credential management.
+The toolkit consists of three main scripts:
 
-## Features
-
-- 🔍 **Code Search**: Searches for specific files across all accessible Bitbucket repositories
-- 🔐 **Secure Authentication**: Uses 1Password integration for secure credential storage
-- 🔄 **2FA Support**: Handles both Bitbucket and Atlassian two-factor authentication
-- 📁 **Auto-cloning**: Automatically clones matching repositories to a specified directory
-- 🚀 **Pagination Support**: Handles multiple pages of search results
-- 🛡️ **Error Handling**: Robust error handling for network issues and authentication failures
+1. **`scripts/jquery-upgrade-analyzer.sh`** - Analyzes all repositories to identify jQuery usage patterns and compatibility issues
+2. **`scripts/jquery-upgrade-script.sh`** - Performs the actual jQuery upgrade across all repositories
+3. **`scripts/jquery-rollback.sh`** - Restores jQuery files from backups if needed
 
 ## Prerequisites
 
-- Node.js (v18 or higher)
-- pnpm package manager
-- 1Password CLI (`op`) installed and authenticated
-- Bitbucket account with access to repositories you want to search
+- Bash shell (tested on macOS and Linux)
+- `curl` for downloading jQuery files
+- `find`, `grep`, `sed` for file operations
+- Write permissions to the repositories directory
 
-## Installation
+## Quick Start
 
-1. Clone this repository:
-```bash
-git clone <repository-url>
-cd scraper
-```
+### Step 1: Analyze Current jQuery Usage
 
-2. Install dependencies:
-```bash
-pnpm install
-```
-
-3. Install Playwright browsers:
-```bash
-npx playwright install chromium
-```
-
-4. (Optional) Install globally for easier access:
-```bash
-pnpm install -g .
-```
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-# 1Password configuration
-ONEPASSWORD_PREFIX="op://vault/item"
-
-# Optional: Custom clone directory (defaults to ./code)
-CLONE_PATH="./repositories"
-
-# Optional: Custom Bitbucket URL (defaults to https://bitbucket.org)
-BITBUCKET_BASE_URL="https://bitbucket.org"
-
-# Optional: Custom log directory (defaults to ./logs)
-LOG_DIR="./logs"
-
-# Optional: Custom log file name (defaults to scraper.log)
-LOG_FILE="scraper.log"
-```
-
-### 1Password Setup
-
-1. Create a secure note in 1Password with the following fields:
-   - `username`: Your Bitbucket username
-   - `password`: Your Bitbucket password
-   - `otp`: Your Bitbucket 2FA secret (TOTP)
-   - `one-time password`: Your Atlassian 2FA secret (TOTP)
-
-2. Update the `ONEPASSWORD_PREFIX` in your `.env` file to point to your 1Password item:
-   ```env
-   ONEPASSWORD_PREFIX="op://your-vault/your-item"
-   ```
-
-## Usage
-
-### Command Line Interface
-
-The scraper now provides a flexible command-line interface with various options:
-
-#### Basic Usage
-
-Search for a specific file and clone repositories:
+First, run the analyzer to understand what needs to be upgraded:
 
 ```bash
-# Using pnpm script
-pnpm scraper --search "jquery-2.1.0.min.js"
-
-# Using pnpm cli (alternative)
-pnpm cli --search "jquery-2.1.0.min.js"
-
-# Direct execution
-./index.ts --search "jquery-2.1.0.min.js"
+./scripts/jquery-upgrade-analyzer.sh
 ```
 
-#### Available Options
+This will:
+- Scan all repositories in the `repos/` directory
+- Identify jQuery files and their versions
+- Check for deprecated jQuery methods
+- Generate a detailed report at `jquery-analysis-report.txt`
+
+### Step 2: Review the Analysis Report
+
+Check the generated report for:
+- Which repositories contain jQuery
+- Current jQuery versions in use
+- Deprecated methods that need attention
+- jQuery plugins that may need updates
+
+### Step 3: Perform the Upgrade
+
+Run the upgrade script:
 
 ```bash
-# Get help for all options
-pnpm scraper --help
-# or
-./index.ts --help
+./scripts/jquery-upgrade-script.sh
 ```
 
-**Required Options:**
-- `--search, -s`: Search term (file name to search for)
+This will:
+- Download jQuery 3.7.1 and related files
+- Create backups of all jQuery files
+- Replace embedded jQuery files with the new version
+- Update dependency files where possible
+- Check for compatibility issues
 
-**Optional Options:**
-- `--url, -u`: Bitbucket URL to search (default: https://bitbucket.org)
-- `--clone-path, -c`: Directory to clone repositories to (overrides CLONE_PATH env var)
-- `--branch, -b`: Branch to clone from (falls back to default if not found)
-- `--dry-run, -d`: Show what would be cloned without actually cloning
-- `--verbose, -v`: Increase verbosity (use multiple times: -v, -vv, -vvv)
-- `--max-results, -m`: Maximum number of repositories to clone
-- `--log-level, -l`: Log level (error, warn, info, debug, verbose) (default: info)
-- `--log-to-file`: Enable logging to files
-- `--no-console`: Disable console output (only log to files)
-- `--help, -h`: Show help
-- `--version, -V`: Show version number
+### Step 4: Test and Verify
 
-### Verbose Levels
+After the upgrade:
+1. Test each application thoroughly
+2. Check for any JavaScript errors in browser consoles
+3. Verify that all jQuery functionality still works
+4. Address any deprecated method warnings
 
-The `--verbose` flag can be used multiple times to increase verbosity:
+### Step 5: Rollback if Needed
 
-- `-v` or `--verbose`: Basic verbose output (info level)
-- `-vv`: Debug level output (includes configuration details)
-- `-vvv`: Maximum verbosity (includes all details and error stacks)
-
-#### Examples
-
-**Search for jQuery files:**
-```bash
-pnpm scraper --search "jquery-2.1.0.min.js"
-```
-
-**Dry run to see what would be cloned:**
-```bash
-pnpm scraper --search "package.json" --dry-run
-```
-
-**Limit to 5 repositories:**
-```bash
-pnpm scraper --search "webpack.config.js" --max-results 5
-```
-
-**Custom clone directory:**
-```bash
-pnpm scraper --search "docker-compose.yml" --clone-path "./my-repos"
-```
-
-**Verbose output:**
-```bash
-# Basic verbose output
-pnpm scraper --search "README.md" --verbose
-
-# More detailed output
-pnpm scraper --search "README.md" -vv
-
-# Maximum verbosity
-pnpm scraper --search "README.md" -vvv
-```
-
-**Search on a different Bitbucket instance:**
-```bash
-pnpm scraper --url "https://bitbucket.company.com" --search "config.yml"
-```
-
-**Clone from a specific branch:**
-```bash
-pnpm scraper --search "package.json" --branch "develop"
-```
-
-**Enable file logging:**
-```bash
-pnpm scraper --search "package.json" --log-to-file --log-level debug
-```
-
-**Log to files only (no console output):**
-```bash
-pnpm scraper --search "package.json" --log-to-file --no-console
-```
-
-**Custom log directory and file name (via environment variables):**
-```bash
-# Set custom log directory and file name
-export LOG_DIR="./my-logs"
-export LOG_FILE="custom.log"
-pnpm scraper --search "package.json" --log-to-file
-```
-
-### Global Installation Usage
-
-If you installed the tool globally, you can use it directly:
+If issues are found, you can rollback to the previous versions:
 
 ```bash
-# Search for files
-bitbucket-scraper --search "package.json"
+# Rollback all repositories
+./scripts/jquery-rollback.sh
 
-# With all the same options
-bitbucket-scraper --search "webpack.config.js" --dry-run --verbose
+# Rollback specific repository
+./scripts/jquery-rollback.sh --repo repository-name
+
+# List available backups
+./scripts/jquery-rollback.sh --list
 ```
 
-### Direct Execution
+## Supported jQuery Usage Patterns
 
-You can also run the script directly:
+The toolkit handles the following patterns:
 
-```bash
-# Make executable (if not already done)
-chmod +x index.ts
+### Embedded jQuery Files
+- `jquery-1.4.1.min.js` → `jquery-3.7.1.min.js`
+- `jquery-ui-1.7.1.custom.min.js` → `jquery-ui-1.13.2.custom.min.js`
+- jQuery plugins (validate, form, maskedinput, etc.)
 
-# Run directly
-./index.ts --search "package.json"
-```
+### Dependency Management
+- `package.json` files (Node.js projects)
+- `pom.xml` files (Maven projects)
+- `build.gradle` files (Gradle projects)
+- `ivy.xml` files (Ivy projects)
+- `*.gemspec` files (Ruby projects)
 
-### Legacy Usage
+### Project Types Supported
+- Java web applications (JSP, WAR files)
+- Grails applications
+- Node.js applications
+- Ruby applications
+- Any project with embedded jQuery files
 
-For backward compatibility, you can still use the old method:
-
-```bash
-pnpm dev
-```
-
-This will use the hardcoded search term from the code.
-
-### Build and Run Production
-
-```bash
-# Build the project
-pnpm build
-
-# Run the built version
-pnpm start
-```
-
-## How It Works
-
-1. **Authentication**: The scraper authenticates with Bitbucket using credentials from 1Password
-2. **Search**: Navigates to Bitbucket and searches for the specified file across all accessible repositories
-3. **Result Processing**: Extracts repository URLs from search results, handling pagination
-4. **Repository Cloning**: For each matching repository, extracts the git clone URL and clones it locally
-5. **Branch Handling**: If a specific branch is requested, attempts to clone from that branch first, then falls back to the default branch if the specified branch doesn't exist
-6. **Logging**: Comprehensive logging system with multiple verbosity levels, supporting both console and file output
-7. **Verbose Levels**: Count-based verbose flag (-v, -vv, -vvv) for different levels of detail
-
-## Project Structure
+## Files and Directories
 
 ```
 scraper/
-├── index.ts              # Main entry point
-├── lib/
-│   ├── config.ts         # Configuration and authentication logic
-│   └── scraper.ts        # Core scraping functionality
-├── package.json          # Dependencies and scripts
-└── tsconfig.json         # TypeScript configuration
+├── scripts/
+│   ├── jquery-upgrade-analyzer.sh    # Analysis script
+│   ├── jquery-upgrade-script.sh      # Main upgrade script
+│   └── jquery-rollback.sh           # Rollback script
+├── jquery-analysis-report.txt   # Generated analysis report
+├── upgrade.log                  # Upgrade execution log
+├── rollback.log                 # Rollback execution log
+├── temp/                        # Temporary files (auto-created)
+└── repos/                       # Repository directory
+    ├── repository-1/
+    │   └── .jquery-backup-YYYYMMDD-HHMMSS/  # Backup directory
+    └── repository-2/
+        └── .jquery-backup-YYYYMMDD-HHMMSS/  # Backup directory
 ```
 
-## Dependencies
+## jQuery 3.7.1 Compatibility Notes
 
-- **Playwright**: Web automation and browser control
-- **1Password CLI**: Secure credential management
-- **otpauth**: TOTP code generation for 2FA
-- **dotenv**: Environment variable management
-- **winston**: Advanced logging with multiple transports and formats
+### Breaking Changes from Older Versions
+
+1. **Deprecated Methods Removed:**
+   - `.live()` → Use `.on()` instead
+   - `.die()` → Use `.off()` instead
+   - `.bind()` → Use `.on()` instead
+   - `.unbind()` → Use `.off()` instead
+   - `.delegate()` → Use `.on()` instead
+   - `.undelegate()` → Use `.off()` instead
+   - `.size()` → Use `.length` instead
+   - `.andSelf()` → Use `.addBack()` instead
+
+2. **Removed Properties:**
+   - `jQuery.browser` → Use feature detection instead
+   - `jQuery.support` → Use feature detection instead
+
+3. **jQuery UI Changes:**
+   - Updated to version 1.13.2
+   - Some widget APIs may have changed
+
+### Common Migration Patterns
+
+```javascript
+// Old (deprecated)
+$('.element').live('click', handler);
+$('.element').die('click');
+
+// New (jQuery 3.7.1)
+$(document).on('click', '.element', handler);
+$(document).off('click', '.element');
+
+// Old (deprecated)
+$('.element').bind('click', handler);
+$('.element').unbind('click');
+
+// New (jQuery 3.7.1)
+$('.element').on('click', handler);
+$('.element').off('click');
+```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Authentication Failures**
-   - Ensure your 1Password CLI is authenticated: `op signin`
-   - Verify your 1Password item contains all required fields
-   - Check that your 2FA secrets are correctly formatted
+1. **Script Permission Denied:**
+   ```bash
+   chmod +x *.sh
+   ```
 
-2. **No Search Results**
-   - Verify the search term exists in accessible repositories
-   - Check your Bitbucket permissions
-   - Ensure the search term is specific enough
+2. **Network Issues Downloading jQuery:**
+   - Check internet connection
+   - Verify proxy settings if behind corporate firewall
+   - Manual download may be required
 
-3. **Clone Failures**
-   - Verify you have access to the repositories
-   - Check your git configuration
-   - Ensure the clone directory is writable
+3. **Backup Directory Not Found:**
+   - Ensure the upgrade script ran successfully
+   - Check for `.jquery-backup-*` directories in repositories
 
-4. **Logging Issues**
-   - Check log file permissions in the logs directory
-   - Verify the log directory is writable
-   - Use `--log-level debug` or `-vv` for detailed debugging information
-   - Use `-vvv` for maximum verbosity and error details
-   - Configure log directory and file name via `LOG_DIR` and `LOG_FILE` environment variables
+4. **jQuery Plugins Not Working:**
+   - Some plugins may need updates for jQuery 3.7.1
+   - Check plugin documentation for compatibility
+   - Consider alternative plugins if needed
 
-### Debug Mode
+### Manual Steps for Complex Cases
 
-For debugging, you can use the verbose flags:
+For repositories with complex jQuery usage:
 
-```bash
-# Basic debugging
-pnpm scraper --search "package.json" --verbose
+1. **Custom jQuery Builds:**
+   - Manually review and update custom jQuery configurations
+   - Test thoroughly after changes
 
-# Detailed debugging with configuration info
-pnpm scraper --search "package.json" -vv
+2. **Heavy Plugin Usage:**
+   - Update plugins to versions compatible with jQuery 3.7.1
+   - Test each plugin individually
 
-# Maximum debugging with all details
-pnpm scraper --search "package.json" -vvv
-```
+3. **Deprecated Method Usage:**
+   - Manually update code to use new jQuery APIs
+   - Use the analysis report to identify all instances
 
-For browser debugging, you can modify the browser launch options in `lib/scraper.ts`:
+## Safety Features
 
-```typescript
-const browser: Browser = await chromium.launch({ 
-  headless: false, // Set to false to see the browser
-  slowMo: 1000     // Add delays to see what's happening
-});
-```
-
-## Security Notes
-
-- Credentials are stored securely in 1Password
-- No sensitive data is logged or stored locally
-- TOTP codes are generated on-demand and not cached
-- The scraper runs in headless mode by default
-
-## License
-
-ISC License
+- **Automatic Backups:** All original files are backed up before modification
+- **Logging:** All operations are logged for audit purposes
+- **Rollback Capability:** Easy restoration of previous versions
+- **Dry-run Analysis:** Understand impact before making changes
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+To extend the toolkit:
 
-## Support
+1. Add support for new project types in the scripts
+2. Update plugin compatibility lists
+3. Add new deprecated method patterns
+4. Improve error handling and reporting
 
-For issues and questions, please open an issue on the repository.
+## License
+
+This toolkit is provided as-is for internal use. Please ensure compliance with jQuery's license terms when using the upgraded files.
