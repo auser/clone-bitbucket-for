@@ -53,31 +53,16 @@ async function main() {
       description: 'Maximum number of repositories to clone',
       default: undefined
     })
-    .option('log-level', {
-      alias: 'l',
-      type: 'string',
-      description: 'Log level (error, warn, info, debug, verbose)',
-      default: 'info'
-    })
-    .option('log-to-file', {
-      type: 'boolean',
-      description: 'Enable logging to files',
-      default: false
-    })
 
-    .option('no-console', {
-      type: 'boolean',
-      description: 'Disable console output (only log to files)',
-      default: false
-    })
+
     .help()
     .alias('help', 'h')
     .version()
     .alias('version', 'V')
     .argv;
 
-  // Determine log level based on verbose count and log-level option
-  let effectiveLogLevel = argv.logLevel ?? 'info';
+  // Determine log level based on verbose count
+  let effectiveLogLevel = 'info';
   if (argv.verbose > 0) {
     const verboseLevels = ['info', 'debug', 'verbose'];
     const verboseIndex = Math.min(argv.verbose - 1, verboseLevels.length - 1);
@@ -95,10 +80,10 @@ async function main() {
   const logLevel = getLogLevel(effectiveLogLevel);
   const logger = initializeLogger({
     level: logLevel,
-    logToFile: argv.logToFile,
+    logToFile: true,
     logDir: config.logDir || undefined,
     logFile: config.logFile || undefined,
-    consoleOutput: !argv.noConsole
+    consoleOutput: true
   });
 
   // Log configuration
@@ -111,10 +96,10 @@ async function main() {
     maxResults: argv.maxResults,
     verboseCount: argv.verbose,
     effectiveLogLevel,
-    logToFile: argv.logToFile,
+    logToFile: true,
     logDir: config.logDir,
     logFile: config.logFile,
-    noConsole: argv.noConsole
+    noConsole: false
   });
 
   // Log search start
@@ -157,7 +142,7 @@ async function main() {
   let errorCount = 0;
 
   for (const [index, result] of repositoriesToClone.entries()) {
-    const repoName = result.split('/').pop();
+    const repoName = result.split('/').pop()?.split('.')[0];
     logger.cloningRepository(repoName!, index + 1, repositoriesToClone.length);
 
     if (existsSync(`${config.clonePath}/${repoName}`)) {
@@ -176,23 +161,20 @@ async function main() {
 
   logger.cloningComplete(successCount, errorCount, config.clonePath);
 
-  // Also log summary to console if not disabled
-  if (!argv.noConsole) {
-    console.log(`\n🎉 Cloning complete!`);
-    console.log(`✅ Successfully cloned: ${successCount} repository(ies)`);
-    if (errorCount > 0) {
-      console.log(`❌ Failed to clone: ${errorCount} repository(ies)`);
-    }
-    console.log(`📂 Repositories saved to: ${config.clonePath}`);
+  // Log summary to console
+  console.log(`\n🎉 Cloning complete!`);
+  console.log(`✅ Successfully cloned: ${successCount} repository(ies)`);
+  if (errorCount > 0) {
+    console.log(`❌ Failed to clone: ${errorCount} repository(ies)`);
+  }
+  console.log(`📂 Repositories saved to: ${config.clonePath}`);
 
-    if (argv.logToFile) {
-      const logFile = logger.getLogFilePath();
-      const errorLogFile = logger.getErrorLogFilePath();
-      console.log(`📝 Logs saved to: ${logFile}`);
-      if (errorLogFile) {
-        console.log(`❌ Error logs saved to: ${errorLogFile}`);
-      }
-    }
+  // Log file information
+  const logFile = logger.getLogFilePath();
+  const errorLogFile = logger.getErrorLogFilePath();
+  console.log(`📝 Logs saved to: ${logFile}`);
+  if (errorLogFile) {
+    console.log(`❌ Error logs saved to: ${errorLogFile}`);
   }
 }
 
