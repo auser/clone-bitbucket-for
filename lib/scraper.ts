@@ -95,7 +95,7 @@ async function scrapeForEachResult(page: Page): Promise<string[]> {
     // Check for next page
     const nextButton = await page.locator('button[aria-label="Next"]').first();
     const isDisabled = await nextButton.getAttribute('disabled');
-    if (await nextButton.isVisible() && isDisabled !== null) {
+    if (await nextButton.isVisible() && isDisabled === null) {
       await nextButton.click();
       await waitForResultsToLoad(page);
       currentPage++;
